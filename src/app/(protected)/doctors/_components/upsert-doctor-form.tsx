@@ -29,6 +29,10 @@ import { useForm } from "react-hook-form";
 import { z } from "zod";
 import { medicalSpecialties } from "./_constants";
 import { NumericFormat } from "react-number-format";
+import { upsertDoctorSchema } from "@/actions/upsert-doctor/schema";
+import { useAction } from "next-safe-action/hooks";
+import { upsertDoctor } from "@/actions/upsert-doctor";
+import { toast } from "sonner";
 
 const formSchema = z
   .object({
@@ -61,22 +65,41 @@ const formSchema = z
     },
   );
 
-const UpsertDoctorForm = () => {
+interface UpsertDoctorFormProps {
+  onSuccess?: () => void;
+}
+
+const UpsertDoctorForm = ({ onSuccess }: UpsertDoctorFormProps) => {
   const form = useForm<z.infer<typeof formSchema>>({
     resolver: zodResolver(formSchema),
     defaultValues: {
       name: "",
       specialty: "",
       appointmentPrice: 0,
-      availableFromWeekDay: "0",
-      availableToWeekDay: "0",
+      availableFromWeekDay: "1",
+      availableToWeekDay: "5",
       availableFromTime: "",
       availableToTime: "",
     },
   });
 
+  const upsertDoctorAction = useAction(upsertDoctor, {
+    onSuccess: () => {
+      toast.success("Médico adicionado com sucesso");
+      onSuccess?.();
+    },
+    onError: (error) => {
+      toast.error("Erro ao adicionar médico");
+    },
+  });
+
   const onSubmit = (data: z.infer<typeof formSchema>) => {
-    console.log(data);
+    upsertDoctorAction.execute({
+      ...data,
+      availableFromWeekDay: parseInt(data.availableFromWeekDay),
+      availableToWeekDay: parseInt(data.availableToWeekDay),
+      appointmentPriceInCents: data.appointmentPrice * 100,
+    });
   };
 
   return (
@@ -353,7 +376,9 @@ const UpsertDoctorForm = () => {
           />
 
           <DialogFooter>
-            <Button type="submit">Adicionar</Button>
+            <Button type="submit" disabled={upsertDoctorAction.isPending}>
+              {upsertDoctorAction.isPending ? "Adicionando..." : "Adicionar"}
+            </Button>
           </DialogFooter>
         </form>
       </Form>
