@@ -1,5 +1,5 @@
 import dayjs from "dayjs";
-import { and, count, eq, gte, lte, sum } from "drizzle-orm";
+import { and, count, eq, gte, lte, sql, sum } from "drizzle-orm";
 import { headers } from "next/headers";
 import { redirect } from "next/navigation";
 
@@ -18,6 +18,7 @@ import { auth } from "@/lib/auth";
 
 import { DatePicker } from "./_components/date-picker";
 import StatsCards from "./_components/stats-cards";
+import RevenueChart from "./_components/revenue-chart";
 
 interface DashboardPageProps {
   searchParams: Promise<{
@@ -81,6 +82,36 @@ const DashboardPage = async ({ searchParams }: DashboardPageProps) => {
         .from(doctorsTable)
         .where(eq(doctorsTable.clinicId, session.user.clinic.id)),
     ]);
+
+  const chartStartDate = dayjs().subtract(10, "days").startOf("day").toDate();
+  const chartEndDate = dayjs().add(10, "days").endOf("day").toDate();
+
+  const dailyAppointmentsData = await db
+    .select({
+      date: sql<string>`date(${appointmentsTable.date})`.as("date"),
+      appointments: count(appointmentsTable.id),
+      revenue:
+        sql<number>`COALESCE(SUM(${appointmentsTable.appointmentPriceInCents}), 0)`.as(
+          "revenue",
+        ),
+    })
+    .from(appointmentsTable)
+    .where(
+      and(
+        eq(appointmentsTable.clinicId, session.user.clinic.id),
+        gte(appointmentsTable.date, chartStartDate),
+        lte(appointmentsTable.date, chartEndDate),
+      ),
+    )
+    .groupBy(sql`DATE(${appointmentsTable.date})`)
+    .orderBy(sql`DATE(${appointmentsTable.date})`);
+
+  const dailyAppointments = dailyAppointmentsData.map((item) => ({
+    date: item.date,
+    appointments: Number(item.appointments),
+    revenue: Number(item.revenue),
+  }));
+
   return (
     <PageContainer>
       <PageHeader>
@@ -101,6 +132,9 @@ const DashboardPage = async ({ searchParams }: DashboardPageProps) => {
           totalPatients={totalPatients.total}
           totalDoctors={totalDoctors.total}
         />
+        <div className="grid grid-cols-[2.2fr_1fr]">
+          <RevenueChart dailyAppointmentsData={dailyAppointments} />
+        </div>
       </PageContent>
     </PageContainer>
   );

@@ -66,36 +66,33 @@ const formSchema = z.object({
   }),
 });
 
-interface UpsertAppointmentFormProps {
+interface AddAppointmentFormProps {
   isOpen: boolean;
   patients: (typeof patientsTable.$inferSelect)[];
   doctors: (typeof doctorsTable.$inferSelect)[];
-  appointment?: typeof appointmentsTable.$inferSelect;
   onSuccess?: () => void;
 }
 
-const UpsertAppointmentForm = ({
-  appointment,
+const AddAppointmentForm = ({
   patients,
   doctors,
   onSuccess,
   isOpen,
-}: UpsertAppointmentFormProps) => {
+}: AddAppointmentFormProps) => {
   const form = useForm<z.infer<typeof formSchema>>({
     shouldUnregister: true,
     resolver: zodResolver(formSchema),
     defaultValues: {
-      patientId: appointment?.patientId ?? "",
-      doctorId: appointment?.doctorId ?? "",
+      patientId: "",
+      doctorId: "",
       appointmentPrice: 0,
-      date: appointment?.date ?? undefined,
+      date: undefined,
       time: "",
     },
   });
 
   const selectedDoctorId = form.watch("doctorId");
   const selectedPatientId = form.watch("patientId");
-
   const selectedDate = form.watch("date");
 
   const { data: availableTimes } = useQuery({
@@ -126,16 +123,16 @@ const UpsertAppointmentForm = ({
   useEffect(() => {
     if (isOpen) {
       form.reset({
-        patientId: appointment?.patientId ?? "",
-        doctorId: appointment?.doctorId ?? "",
+        patientId: "",
+        doctorId: "",
         appointmentPrice: 0,
-        date: appointment?.date ?? undefined,
+        date: undefined,
         time: "",
       });
     }
-  }, [isOpen, form, appointment]);
+  }, [isOpen, form]);
 
-  const upsertAppointmentAction = useAction(upsertAppointment, {
+  const createAppointmentAction = useAction(upsertAppointment, {
     onSuccess: () => {
       toast.success("Agendamento criado com sucesso.");
       onSuccess?.();
@@ -146,15 +143,14 @@ const UpsertAppointmentForm = ({
   });
 
   const onSubmit = (values: z.infer<typeof formSchema>) => {
-    upsertAppointmentAction.execute({
+    createAppointmentAction.execute({
       ...values,
-      id: appointment?.id,
       appointmentPriceInCents: values.appointmentPrice * 100,
     });
   };
 
   const isDateAvailable = (date: Date) => {
-    if (selectedDoctorId) return false;
+    if (!selectedDoctorId) return false;
     const selectedDoctor = doctors.find(
       (doctor) => doctor.id === selectedDoctorId,
     );
@@ -171,13 +167,9 @@ const UpsertAppointmentForm = ({
   return (
     <DialogContent className="sm:max-w-[500px]">
       <DialogHeader>
-        <DialogTitle>
-          {appointment ? "Editar agendamento" : "Novo agendamento"}
-        </DialogTitle>
+        <DialogTitle>Novo agendamento</DialogTitle>
         <DialogDescription>
-          {appointment
-            ? "Edite as informações deste agendamento."
-            : "Crie um novo agendamento."}
+          Crie um novo agendamento para sua clínica.
         </DialogDescription>
       </DialogHeader>
       <Form {...form}>
@@ -294,11 +286,11 @@ const UpsertAppointmentForm = ({
                       mode="single"
                       selected={field.value}
                       onSelect={field.onChange}
+                      locale={ptBR}
                       disabled={(date) =>
                         date < new Date() || !isDateAvailable(date)
                       }
                       initialFocus
-                      locale={ptBR}
                     />
                   </PopoverContent>
                 </Popover>
@@ -330,7 +322,7 @@ const UpsertAppointmentForm = ({
                         value={time.value}
                         disabled={!time.available}
                       >
-                        {time.label} {time.available && "(Indisponível)"}
+                        {time.label} {!time.available && "(Indisponível)"}
                       </SelectItem>
                     ))}
                   </SelectContent>
@@ -341,12 +333,10 @@ const UpsertAppointmentForm = ({
           />
 
           <DialogFooter>
-            <Button type="submit" disabled={upsertAppointmentAction.isPending}>
-              {upsertAppointmentAction.isPending
-                ? "Salvando..."
-                : appointment
-                  ? "Salvar alterações"
-                  : "Criar agendamento"}
+            <Button type="submit" disabled={createAppointmentAction.isPending}>
+              {createAppointmentAction.isPending
+                ? "Criando..."
+                : "Criar agendamento"}
             </Button>
           </DialogFooter>
         </form>
@@ -355,4 +345,4 @@ const UpsertAppointmentForm = ({
   );
 };
 
-export default UpsertAppointmentForm;
+export default AddAppointmentForm;
